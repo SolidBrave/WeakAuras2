@@ -6,15 +6,8 @@ local L = WeakAuras.L
 local send_chat_message_types = WeakAuras.send_chat_message_types;
 local sound_types = WeakAuras.sound_types;
 
-local RestrictedChannelCheck
-if WeakAuras.IsClassic() then
-  RestrictedChannelCheck = function()
-    return false
-  end
-else
-  RestrictedChannelCheck = function(data)
-    return data.message_type == "SAY" or data.message_type == "YELL" or data.message_type == "SMARTRAID"
-  end
+local function RestrictedChannelCheck(data)
+  return data.message_type == "SAY" or data.message_type == "YELL" or data.message_type == "SMARTRAID"
 end
 
 function WeakAuras.AddActionOption(id, data)

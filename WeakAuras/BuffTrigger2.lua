@@ -61,22 +61,13 @@ if not WeakAuras.IsCorrectVersion() then return end
 -- Lua APIs
 local tinsert, wipe = table.insert, wipe
 local pairs, next, type = pairs, next, type
-local UnitAura = UnitAura
-
-local LCD
-if WeakAuras.IsClassic() then
-  LCD = LibStub("LibClassicDurations")
-  LCD:Register("WeakAuras")
-  UnitAura = LCD.UnitAuraWithBuffs
-end
+local UnitAura, UnitGroupRolesAssigned = UnitAura, UnitGroupRolesAssigned
 
 local WeakAuras = WeakAuras
 local L = WeakAuras.L
 local timer = WeakAuras.timer
 local BuffTrigger = {}
 local triggerInfos = {}
-
-local UnitGroupRolesAssigned = not WeakAuras.IsClassic() and UnitGroupRolesAssigned or function() return "DAMAGER" end
 
 -- keyed on unit, debuffType, spellname, with a scan object value
 -- scan object: id, triggernum, scanFunc
@@ -1114,7 +1105,7 @@ local function PrepareMatchData(unit, filter)
     local time = GetTime()
     local index = 1
     while true do
-      local name, icon, stacks, debuffClass, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, index, filter)
+      local name, _, icon, stacks, debuffClass, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, index, filter)
       if not name then
         break
       end
@@ -1208,7 +1199,7 @@ local function ScanUnitWithFilter(matchDataChanged, time, unit, filter,
 
   if UnitExistsFixed(unit) then
     while true do
-      local name, icon, stacks, debuffClass, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, index, filter)
+      local name, _, icon, stacks, debuffClass, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, index, filter)
       if not name then
         break
       end
@@ -1513,16 +1504,10 @@ end
 
 frame:RegisterEvent("UNIT_AURA")
 frame:RegisterUnitEvent("UNIT_PET", "player")
-if not WeakAuras.IsClassic() then
-  frame:RegisterEvent("PLAYER_FOCUS_CHANGED")
-  frame:RegisterEvent("ARENA_OPPONENT_UPDATE")
-  frame:RegisterEvent("UNIT_ENTERED_VEHICLE")
-  frame:RegisterEvent("UNIT_EXITED_VEHICLE")
-else
-  LCD.RegisterCallback("WeakAuras", "UNIT_BUFF", function(event, unit)
-    EventHandler(frame, "UNIT_AURA", unit)
-  end)
-end
+frame:RegisterEvent("PLAYER_FOCUS_CHANGED")
+frame:RegisterEvent("ARENA_OPPONENT_UPDATE")
+frame:RegisterEvent("UNIT_ENTERED_VEHICLE")
+frame:RegisterEvent("UNIT_EXITED_VEHICLE")
 frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 frame:RegisterEvent("ENCOUNTER_START")
 frame:RegisterEvent("ENCOUNTER_END")
@@ -2039,7 +2024,7 @@ local function createScanFunc(trigger)
       return true
     end
   ]]
-
+  
   local func, err = loadstring(ret)
 
   if func then
@@ -2865,7 +2850,7 @@ end
 local function AugmentMatchDataMulti(matchData, unit, filter, sourceGUID, nameKey, spellKey)
   local index = 1
   while true do
-    local name, icon, stacks, debuffClass, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, index, filter)
+    local name, _, icon, stacks, debuffClass, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, index, filter)
     if not name then
       return false
     end
@@ -2955,7 +2940,7 @@ end
 local function CheckAurasMulti(base, unit, filter)
   local index = 1
   while true do
-    local name, icon, stacks, debuffClass, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, index, filter)
+    local name, _, icon, stacks, debuffClass, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, index, filter)
     if not name then
       return false
     end
@@ -3010,9 +2995,7 @@ function BuffTrigger.InitMultiAura()
     multiAuraFrame:RegisterEvent("UNIT_TARGET")
     multiAuraFrame:RegisterEvent("UNIT_AURA")
     multiAuraFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
-    if not WeakAuras.IsClassic() then
-      multiAuraFrame:RegisterEvent("PLAYER_FOCUS_CHANGED")
-    end
+    multiAuraFrame:RegisterEvent("PLAYER_FOCUS_CHANGED")
     multiAuraFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
     multiAuraFrame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
     multiAuraFrame:RegisterEvent("PLAYER_LEAVING_WORLD")
@@ -3024,7 +3007,7 @@ end
 function BuffTrigger.HandleMultiEvent(frame, event, ...)
   WeakAuras.StartProfileSystem("bufftrigger2 - multi")
   if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-    CombatLog(CombatLogGetCurrentEventInfo())
+    CombatLog(...)
   elseif event == "UNIT_TARGET" then
     TrackUid(...)
   elseif event == "PLAYER_TARGET_CHANGED" then

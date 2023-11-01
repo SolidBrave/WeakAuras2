@@ -62,8 +62,7 @@ if not WeakAuras.IsCorrectVersion() then return end
 local tinsert, wipe = table.insert, wipe
 local pairs, next, type = pairs, next, type
 local BUFF_MAX_DISPLAY = 255 -- Do tell when you find the real value.
-local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
-local UnitGroupRolesAssigned = not WeakAuras.IsClassic() and UnitGroupRolesAssigned or function() return "DAMAGER" end
+local CombatLogGetCurrentEventInfo, UnitGroupRolesAssigned = CombatLogGetCurrentEventInfo, UnitGroupRolesAssigned
 
 local WeakAuras = WeakAuras;
 local L = WeakAuras.L;
@@ -502,7 +501,7 @@ function WeakAuras.ScanAuras(unit)
               -- Update scan cache
               if(aura_scan_cache[unit][filter].up_to_date < index) then
                 -- Query aura data
-                name, icon, count, debuffClass, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, index, filter);
+                name, _, icon, count, debuffClass, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, index, filter);
                 if (debuffClass == nil) then
                   debuffClass = "none";
                 elseif (debuffClass == "") then
@@ -625,7 +624,7 @@ function WeakAuras.ScanAuras(unit)
               -- Fetch aura data
               local detected
               for i = 1, BUFF_MAX_DISPLAY do
-                name, icon, count, _, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, i, filter);
+                name, _, icon, count, _, duration, expirationTime, unitCaster, isStealable, _, spellId = UnitAura(unit, i, filter);
                 if not name then break end
                 if name == checkname then
                   detected = true
@@ -1050,7 +1049,7 @@ do
         local detected
         local name, icon, count, duration, expirationTime, unitCaster, spellId, _
         for i = 1, BUFF_MAX_DISPLAY do
-          name, icon, count, _, duration, expirationTime, unitCaster, _, _, spellId = UnitAura(unit, i, filter);
+          name, _, icon, count, _, duration, expirationTime, unitCaster, _, _, spellId = UnitAura(unit, i, filter);
           if not name then break end
           if name == spellName then
             detected = true
@@ -1200,7 +1199,7 @@ do
   local function handleEvent(frame, event, ...)
     WeakAuras.StartProfileSystem("bufftrigger - multi");
     if(event == "COMBAT_LOG_EVENT_UNFILTERED") then
-      combatLog(CombatLogGetCurrentEventInfo());
+      combatLog(...);
     elseif(event == "UNIT_TARGET") then
       uidTrack(...);
     elseif(event == "PLAYER_FOCUS_CHANGED") then
@@ -1229,7 +1228,7 @@ do
               local detected
               local name, icon, count, duration, expirationTime, unitCaster, _
               for i = 1, BUFF_MAX_DISPLAY do
-                name, icon, count, _, duration, expirationTime, unitCaster = UnitAura(uid, i, filter);
+                name, _, icon, count, _, duration, expirationTime, unitCaster = UnitAura(uid, i, filter);
                 if not name then break end
                 if name == spellName then
                   detected = true
@@ -1268,9 +1267,7 @@ do
       combatAuraFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED");
       combatAuraFrame:RegisterEvent("UNIT_TARGET");
       combatAuraFrame:RegisterEvent("UNIT_AURA");
-      if not WeakAuras.IsClassic() then
-        combatAuraFrame:RegisterEvent("PLAYER_FOCUS_CHANGED");
-      end
+      combatAuraFrame:RegisterEvent("PLAYER_FOCUS_CHANGED");
       combatAuraFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED");
       combatAuraFrame:RegisterEvent("NAME_PLATE_UNIT_REMOVED");
       combatAuraFrame:RegisterEvent("PLAYER_LEAVING_WORLD");
@@ -1365,9 +1362,7 @@ end
 local frame = CreateFrame("FRAME");
 WeakAuras.frames["WeakAuras Buff Frame"] = frame;
 frame:RegisterEvent("PLAYER_ENTERING_WORLD");
-if not WeakAuras.IsClassic() then
-  frame:RegisterEvent("PLAYER_FOCUS_CHANGED");
-end
+frame:RegisterEvent("PLAYER_FOCUS_CHANGED");
 frame:RegisterEvent("PLAYER_TARGET_CHANGED");
 frame:RegisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT");
 frame:RegisterEvent("UNIT_AURA");

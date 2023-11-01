@@ -78,42 +78,14 @@ end
 LibRangeCheck:RegisterCallback(LibRangeCheck.CHECKERS_CHANGED, RangeCacheUpdate)
 
 local LibClassicCasterino
-if WeakAuras.IsClassic() then
-  LibClassicCasterino = LibStub("LibClassicCasterino")
-  WeakAuras.GetTotemInfo = LibStub("LibTotemInfo-1.0").GetTotemInfo
-else
-  WeakAuras.GetTotemInfo = GetTotemInfo
-end
 
-if not WeakAuras.IsClassic() then
-  WeakAuras.UnitCastingInfo = UnitCastingInfo
-else
-  WeakAuras.UnitCastingInfo = function(unit)
-    if UnitIsUnit(unit, "player") then
-      return CastingInfo()
-    else
-      return LibClassicCasterino:UnitCastingInfo(unit)
-    end
-  end
-end
-
-function WeakAuras.UnitChannelInfo(unit)
-  if not WeakAuras.IsClassic() then
-    return UnitChannelInfo(unit)
-  elseif UnitIsUnit(unit, "player") then
-    return ChannelInfo()
-  else
-    return LibClassicCasterino:UnitChannelInfo(unit)
-  end
-end
-
+WeakAuras.GetTotemInfo = GetTotemInfo
+WeakAuras.UnitCastingInfo = UnitCastingInfo
+WeakAuras.UnitChannelInfo = UnitChannelInfo
 
 
 local encounter_list = ""
-local zoneId_list = ""
-local zoneGroupId_list = ""
 function WeakAuras.InitializeEncounterAndZoneLists()
-  if WeakAuras.IsClassic() then return "" end
   EJ_SelectTier(EJ_GetNumTiers())
 
   for _, inRaid in ipairs({false, true}) do
@@ -121,32 +93,12 @@ function WeakAuras.InitializeEncounterAndZoneLists()
     local instance_id = EJ_GetInstanceByIndex(instance_index, inRaid)
 
     local title = inRaid and L["Raids"] or L["Dungeons"]
-    zoneId_list = ("%s|cffffd200%s|r\n"):format(zoneId_list, title)
-    zoneGroupId_list = ("%s|cffffd200%s|r\n"):format(zoneGroupId_list, title)
 
     while instance_id do
       EJ_SelectInstance(instance_id)
       local instance_name, _, _, _, _, _, dungeonAreaMapID = EJ_GetInstanceInfo(instance_id)
       local ej_index = 1
       local boss, _, _, _, _, _, encounter_id = EJ_GetEncounterInfoByIndex(ej_index, instance_id)
-
-      -- zone ids and zone group ids
-      if dungeonAreaMapID and dungeonAreaMapID ~= 0 then
-        local mapGroupId = C_Map.GetMapGroupID(dungeonAreaMapID)
-        if mapGroupId then
-          zoneGroupId_list = ("%s%s: %d\n"):format(zoneGroupId_list, instance_name, mapGroupId)
-          local maps = ""
-          for k, map in ipairs(C_Map.GetMapGroupMembersInfo(mapGroupId)) do
-            if map.mapID then
-              maps = maps .. map.mapID .. ", "
-            end
-          end
-          maps = maps:match "^(.*), \n?$" or "" -- trim last ", "
-          zoneId_list = ("%s%s: %s\n"):format(zoneId_list, instance_name, maps)
-        else
-          zoneId_list = ("%s%s: %d\n"):format(zoneId_list, instance_name, dungeonAreaMapID)
-        end
-      end
 
       -- Encounter ids
       if inRaid then
@@ -166,56 +118,13 @@ function WeakAuras.InitializeEncounterAndZoneLists()
       instance_index = instance_index + 1
       instance_id = EJ_GetInstanceByIndex(instance_index, inRaid)
     end
-    zoneId_list = zoneId_list .. "\n"
-    zoneGroupId_list = zoneGroupId_list .. "\n"
   end
 
   encounter_list = encounter_list:sub(1, -3) .. "\n\n" .. L["Supports multiple entries, separated by commas\n"]
 end
 
 local function get_encounters_list()
-  if WeakAuras.IsClassic() then return "" end
-
   return encounter_list
-end
-
-local function get_zoneId_list()
-  if WeakAuras.IsClassic() then return "" end
-  local currentmap_id = C_Map.GetBestMapForUnit("player")
-  local currentmap_info = C_Map.GetMapInfo(currentmap_id)
-  local currentmap_name = currentmap_info and currentmap_info.name or ""
-  local mapGroupId = C_Map.GetMapGroupID(currentmap_id)
-  if mapGroupId then
-    -- if map is in a group, its real name is (or should be?) found in GetMapGroupMembersInfo
-    for k, map in ipairs(C_Map.GetMapGroupMembersInfo(mapGroupId)) do
-      if map.mapID and map.mapID == currentmap_id and map.name then
-        currentmap_name = map.name
-        break
-      end
-    end
-  end
-  return ("%s|cffffd200%s|r%s: %d\n\n%s"):format(
-    zoneId_list,
-    L["Current Zone\n"],
-    currentmap_name,
-    currentmap_id,
-    L["Supports multiple entries, separated by commas"]
-  )
-end
-
-local function get_zoneGroupId_list()
-  if WeakAuras.IsClassic() then return "" end
-  local currentmap_id = C_Map.GetBestMapForUnit("player")
-  local currentmap_info = C_Map.GetMapInfo(currentmap_id)
-  local currentmap_name = currentmap_info and currentmap_info.name
-  local currentmapgroup_id = C_Map.GetMapGroupID(currentmap_id)
-  return ("%s|cffffd200%s|r\n%s%s\n\n%s"):format(
-    zoneGroupId_list,
-    L["Current Zone Group"],
-    currentmapgroup_id and currentmap_name and currentmap_name..": " or "",
-    currentmapgroup_id or L["None"],
-    L["Supports multiple entries, separated by commas"]
-  )
 end
 
 WeakAuras.function_strings = {
@@ -612,49 +521,27 @@ WeakAuras.anim_presets = {
 
 WeakAuras.class_ids = {}
 for classID = 1, 20 do -- GetNumClasses not supported by wow classic
-  local classInfo = C_CreatureInfo.GetClassInfo(classID)
-  if classInfo then
-    WeakAuras.class_ids[classInfo.classFile] = classInfo.classID
+  local _, classFile, classID = GetClassInfo(classID)
+  if classFile then
+    WeakAuras.class_ids[classFile] = classID
   end
 end
 
 function WeakAuras.CheckTalentByIndex(index)
-  if WeakAuras.IsClassic() then
-    local tab = ceil(index / 20)
-    local num_talent = (index - 1) % 20 + 1
-    local _, _, _, _, rank  = GetTalentInfo(tab, num_talent)
-    return rank and rank > 0;
-  else
-    local tier = ceil(index / 3)
-    local column = (index - 1) % 3 + 1
-    local _, _, _, selected, _, _, _, _, _, _, known  = GetTalentInfo(tier, column, 1)
-    return selected or known;
-  end
+  local tier = ceil(index / 3)
+  local column = (index - 1) % 3 + 1
+  local _, _, _, selected, _, _, _, _, _, _, known  = GetTalentInfo(tier, column, 1)
+  return selected or known;
 end
 
 -- The one true order of the first 3 talents, see the setup of WeakAuras.pvp_talent_types
 local pvpTalentId = { 3589, 3588, 3587 };
 
 function WeakAuras.CheckPvpTalentByIndex(index)
-  if (index <= 3) then
-    local talentSlotInfo = C_SpecializationInfo.GetPvpTalentSlotInfo(1);
-    if (not talentSlotInfo or not talentSlotInfo.selectedTalentID) then
-      return false;
-    end
-    return select(3, GetPvpTalentInfoByID(pvpTalentId[index])) == select(3, GetPvpTalentInfoByID(talentSlotInfo.selectedTalentID));
-  else
-    local checkTalentSlotInfo = C_SpecializationInfo.GetPvpTalentSlotInfo(2)
-    if checkTalentSlotInfo then
-      local checkTalentId = checkTalentSlotInfo.availableTalentIDs[index - 3];
-      for i = 2, 4 do
-        local talentSlotInfo = C_SpecializationInfo.GetPvpTalentSlotInfo(i);
-        if talentSlotInfo and (talentSlotInfo.selectedTalentID == checkTalentId) then
-          return true;
-        end
-      end
-    end
-    return false;
-  end
+  local tier = ceil(index / 3)
+  local column = (index - 1) % 3 + 1
+  local _, _, _, selected = GetPvpTalentInfo(tier, column, 1)
+  return selected
 end
 
 function WeakAuras.CheckNumericIds(loadids, currentId)
@@ -783,25 +670,15 @@ function WeakAuras.IsSpellKnown(spell, pet)
 end
 
 function WeakAuras.IsSpellKnownIncludingPet(spell)
+  local name
   if (not tonumber(spell)) then
     spell = select(7, GetSpellInfo(spell));
   end
   if (not spell) then
     return false;
   end
-  if (WeakAuras.IsSpellKnown(spell) or WeakAuras.IsSpellKnown(spell, true)) then
-    return true;
-  end
-  -- WORKAROUND brain damage around void eruption
-  -- In shadow form void eruption is overriden by void bolt, yet IsSpellKnown for void bolt
-  -- returns false, whereas it returns true for void eruption
-  local baseSpell = FindBaseSpellByID(spell);
-  if (not baseSpell) then
-    return false;
-  end
-  if (baseSpell ~= spell) then
-    return WeakAuras.IsSpellKnown(baseSpell) or WeakAuras.IsSpellKnown(baseSpell, true);
-  end
+  
+  return WeakAuras.IsSpellKnown(spell) or WeakAuras.IsSpellKnown(spell, true)
 end
 
 function WeakAuras.UnitPowerDisplayMod(powerType)
@@ -820,29 +697,17 @@ end
 
 function WeakAuras.GetNumSetItemsEquipped(setID)
   if not setID or not type(setID) == "number" then return end
-  if not WeakAuras.IsClassic() then
-    local itemList = C_LootJournal.GetItemSetItems(setID)
-    if not itemList then return end
-    local setName = GetItemSetInfo(setID)
-    local max = #itemList
-    local equipped = 0
-    for _,v in ipairs(itemList) do
-      if IsEquippedItem(v.itemID) then
-        equipped = equipped + 1
-      end
+  local itemList = C_LootJournal.GetItemSetItems(setID)
+  if not itemList then return end
+  local setName = GetItemSetInfo(setID)
+  local max = #itemList
+  local equipped = 0
+  for _,v in ipairs(itemList) do
+    if IsEquippedItem(v.itemID) then
+      equipped = equipped + 1
     end
-   return equipped, max, setName
-  else
-    local equipped = 0
-    local setName = GetItemSetInfo(setID)
-    for i = 1, 18 do
-      local item = GetInventoryItemID("player", i)
-      if item and select(16, GetItemInfo(item)) == setID then
-        equipped = equipped + 1
-      end
-    end
-    return equipped, 18, setName
   end
+  return equipped, max, setName
 end
 
 local function valuesForTalentFunction(trigger)
@@ -869,35 +734,30 @@ local function valuesForTalentFunction(trigger)
     end
 
     local single_spec;
-    if not WeakAuras.IsClassic() then
-      if single_class then
-        if(trigger.use_spec == false and trigger.spec and trigger.spec.multi) then
-          local num_specs = 0;
-          for spec in pairs(trigger.spec.multi) do
-            single_spec = spec;
-            num_specs = num_specs + 1;
-          end
-          if (num_specs ~= 1) then
-            single_spec = nil;
-          end
+    if single_class then
+      if(trigger.use_spec == false and trigger.spec and trigger.spec.multi) then
+        local num_specs = 0;
+        for spec in pairs(trigger.spec.multi) do
+          single_spec = spec;
+          num_specs = num_specs + 1;
+        end
+        if (num_specs ~= 1) then
+          single_spec = nil;
         end
       end
-      if ((not single_spec) and trigger.use_spec and trigger.spec and trigger.spec.single) then
-        single_spec = trigger.spec.single;
-      end
+    end
+    if ((not single_spec) and trigger.use_spec and trigger.spec and trigger.spec.single) then
+      single_spec = trigger.spec.single;
+    end
 
-      if (trigger.use_spec == nil) then
-        single_spec = GetSpecialization();
-      end
+    if (trigger.use_spec == nil) then
+      single_spec = GetSpecialization();
     end
 
     -- If a single specific class was found, load the specific list for it
     if(single_class and WeakAuras.talent_types_specific[single_class]
       and single_spec and WeakAuras.talent_types_specific[single_class][single_spec]) then
       return WeakAuras.talent_types_specific[single_class][single_spec];
-    elseif(WeakAuras.IsClassic() and single_class and WeakAuras.talent_types_specific[single_class]
-      and WeakAuras.talent_types_specific[single_class]) then
-      return WeakAuras.talent_types_specific[single_class];
     else
       return WeakAuras.talent_types;
     end
@@ -925,17 +785,6 @@ WeakAuras.load_prototype = {
       events = {"ENCOUNTER_START", "ENCOUNTER_END"}
     },
     {
-      name = "warmode",
-      display = L["War Mode Active"],
-      type = "tristate",
-      init = "arg",
-      width = WeakAuras.doubleWidth,
-      optional = true,
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
-      events = {"UNIT_FLAGS"}
-    },
-    {
       name = "never",
       display = L["Never"],
       type = "toggle",
@@ -949,8 +798,6 @@ WeakAuras.load_prototype = {
       init = "arg",
       width = WeakAuras.normalWidth,
       optional = true,
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
       events = {"PET_BATTLE_OPENING_START", "PET_BATTLE_CLOSE"}
     },
     {
@@ -960,8 +807,6 @@ WeakAuras.load_prototype = {
       init = "arg",
       width = WeakAuras.normalWidth,
       optional = true,
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
       events = {"VEHICLE_UPDATE", "UNIT_ENTERED_VEHICLE", "UNIT_EXITED_VEHICLE", "UPDATE_OVERRIDE_ACTIONBAR", "UNIT_FLAGS"}
     },
     {
@@ -971,8 +816,6 @@ WeakAuras.load_prototype = {
       init = "arg",
       width = WeakAuras.normalWidth,
       optional = true,
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
       events = {"VEHICLE_UPDATE", "UNIT_ENTERED_VEHICLE", "UNIT_EXITED_VEHICLE", "UPDATE_OVERRIDE_ACTIONBAR"}
     },
     {
@@ -1051,8 +894,6 @@ WeakAuras.load_prototype = {
         end
       end,
       init = "arg",
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
       events = {"PLAYER_TALENT_UPDATE"}
     },
     {
@@ -1061,8 +902,6 @@ WeakAuras.load_prototype = {
       type = "multiselect",
       values = "spec_types_all",
       init = "arg",
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
       events = {"PLAYER_TALENT_UPDATE"}
     },
     {
@@ -1154,8 +993,6 @@ WeakAuras.load_prototype = {
         end
       end,
       test = "WeakAuras.CheckPvpTalentByIndex(%d)",
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
       events = {"PLAYER_PVP_TALENT_UPDATE"}
     },
     {
@@ -1193,8 +1030,6 @@ WeakAuras.load_prototype = {
       type = "number",
       init = "arg",
       desc = L["The effective level differs from the level in e.g. Time Walking dungeons."],
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
       events = {"PLAYER_LEVEL_UP", "UNIT_FLAGS", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA"}
     },
     {
@@ -1205,36 +1040,12 @@ WeakAuras.load_prototype = {
       events = {"ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA", "VEHICLE_UPDATE"}
     },
     {
-      name = "zoneId",
-      display = L["Zone ID(s)"],
-      type = "string",
-      init = "arg",
-      desc = get_zoneId_list,
-      test = "WeakAuras.CheckNumericIds(%q, zoneId)",
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
-      events = {"ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA", "VEHICLE_UPDATE"}
-    },
-    {
-      name = "zonegroupId",
-      display = L["Zone Group ID(s)"],
-      type = "string",
-      init = "arg",
-      desc = get_zoneGroupId_list,
-      test = "WeakAuras.CheckNumericIds(%q, zonegroupId)",
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
-      events = {"ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA", "VEHICLE_UPDATE"}
-    },
-    {
       name = "encounterid",
       display = L["Encounter ID(s)"],
       type = "string",
       init = "arg",
       desc = get_encounters_list,
       test = "WeakAuras.CheckNumericIds(%q, encounterid)",
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
       events = {"ENCOUNTER_START", "ENCOUNTER_END"}
     },
     {
@@ -1252,8 +1063,6 @@ WeakAuras.load_prototype = {
       type = "multiselect",
       values = "difficulty_types",
       init = "arg",
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
       events = {"PLAYER_DIFFICULTY_CHANGED", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA"}
     },
     {
@@ -1262,8 +1071,6 @@ WeakAuras.load_prototype = {
       type = "multiselect",
       values = "role_types",
       init = "arg",
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
       events = {"PLAYER_ROLES_ASSIGNED", "PLAYER_TALENT_UPDATE"}
     },
     {
@@ -1273,8 +1080,6 @@ WeakAuras.load_prototype = {
       values = "mythic_plus_affixes",
       init = "arg",
       test = "WeakAuras.CheckMPlusAffixIds(%d, affixes)",
-      enable = not WeakAuras.IsClassic(),
-      hidden = WeakAuras.IsClassic(),
       events = {"CHALLENGE_MODE_START", "CHALLENGE_MODE_COMPLETED"}
     },
     {
@@ -1452,13 +1257,11 @@ WeakAuras.event_prototypes = {
       local result = {}
       AddUnitChangeEvents(trigger.unit, result)
       AddUnitEventForEvents(result, trigger.unit, "UNIT_HEALTH_FREQUENT")
-      if not WeakAuras.IsClassic() then
-        if trigger.use_showAbsorb then
-          AddUnitEventForEvents(result, trigger.unit, "UNIT_ABSORB_AMOUNT_CHANGED")
-        end
-        if trigger.use_showIncomingHeal then
-          AddUnitEventForEvents(result, trigger.unit, "UNIT_HEAL_PREDICTION")
-        end
+      if trigger.use_showAbsorb then
+        AddUnitEventForEvents(result, trigger.unit, "UNIT_ABSORB_AMOUNT_CHANGED")
+      end
+      if trigger.use_showIncomingHeal then
+        AddUnitEventForEvents(result, trigger.unit, "UNIT_HEAL_PREDICTION")
       end
       return result
     end,
@@ -1511,8 +1314,6 @@ WeakAuras.event_prototypes = {
         type = "toggle",
         test = "true",
         reloadOptions = true,
-        enable = not WeakAuras.IsClassic(),
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "absorbMode",
@@ -1521,8 +1322,7 @@ WeakAuras.event_prototypes = {
         test = "true",
         values = "absorb_modes",
         required = true,
-        enable = function(trigger) return WeakAuras.IsClassic() and trigger.use_showAbsorb end,
-        hidden = WeakAuras.IsClassic()
+        enable = function(trigger) return trigger.use_showAbsorb end,
       },
       {
         name = "showIncomingHeal",
@@ -1530,8 +1330,6 @@ WeakAuras.event_prototypes = {
         type = "toggle",
         test = "true",
         reloadOptions = true,
-        enable = not WeakAuras.IsClassic(),
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "absorb",
@@ -1540,8 +1338,7 @@ WeakAuras.event_prototypes = {
         init = "UnitGetTotalAbsorbs(concernedUnit)",
         store = true,
         conditionType = "number",
-        enable = function(trigger) return not WeakAuras.IsClassic() and trigger.use_showAbsorb end,
-        hidden = WeakAuras.IsClassic()
+        enable = function(trigger) return trigger.use_showAbsorb end,
       },
       {
         name = "healprediction",
@@ -1550,8 +1347,7 @@ WeakAuras.event_prototypes = {
         init = "UnitGetIncomingHeals(concernedUnit)",
         store = true,
         conditionType = "number",
-        enable = function(trigger) return not WeakAuras.IsClassic() and trigger.use_showIncomingHeal end,
-        hidden = WeakAuras.IsClassic()
+        enable = function(trigger) return trigger.use_showIncomingHeal end,
       },
       {
         hidden = true,
@@ -1576,7 +1372,7 @@ WeakAuras.event_prototypes = {
           end
         end,
         enable = function(trigger)
-          return not WeakAuras.IsClassic() and trigger.use_showAbsorb;
+          return trigger.use_showAbsorb;
         end
       },
       {
@@ -1588,7 +1384,7 @@ WeakAuras.event_prototypes = {
           end
         end,
         enable = function(trigger)
-          return not WeakAuras.IsClassic() and trigger.use_showIncomingHeal;
+          return trigger.use_showIncomingHeal;
         end
       }
     },
@@ -1629,10 +1425,9 @@ WeakAuras.event_prototypes = {
         local unitPowerType = UnitPowerType(concernedUnit);
         local powerTypeToCheck = powerType or unitPowerType;
         local powerThirdArg = WeakAuras.UseUnitPowerThirdArg(powerTypeToCheck);
-        if WeakAuras.IsClassic() and powerType == 99 then powerType = 1 end
       ]=];
       ret = ret:format(trigger.unit, trigger.unit, trigger.use_powertype and trigger.powertype or "nil");
-      if (trigger.use_powertype and trigger.powertype == 99 and not WeakAuras.IsClassic()) then
+      if (trigger.use_powertype and trigger.powertype == 99) then
         ret = ret .. [[
           local UnitPower = UnitStagger;
           local UnitPowerMax = UnitHealthMax;
@@ -1665,12 +1460,7 @@ WeakAuras.event_prototypes = {
             end
             state.changed = true;
           elseif (event == "UNIT_DISPLAYPOWER") then
-            local spellID;
-            if WeakAuras.IsClassic() then
-              spellID = select(9, CastingInfo());
-            else
-              spellID = select(9, UnitCastingInfo("player"));
-            end
+            local spellID = select(9, UnitCastingInfo("player"));
             if spellID then
               local costTable = GetSpellPowerCost(spellID);
               local cost;
@@ -1710,7 +1500,7 @@ WeakAuras.event_prototypes = {
         name = "powertype",
         display = L["Power Type"],
         type = "select",
-        values = function() return WeakAuras.IsClassic() and WeakAuras.power_types or WeakAuras.power_types_with_stagger end,
+        values = 'power_types_with_stagger',
         init = "unitPowerType",
         test = "true",
         store = true,
@@ -1749,7 +1539,7 @@ WeakAuras.event_prototypes = {
         name = "power",
         display = L["Power"],
         type = "number",
-        init = WeakAuras.IsClassic() and "powerType == 4 and GetComboPoints(unit, 'target') or UnitPower(concernedUnit, powerType, powerThirdArg) / WeakAuras.UnitPowerDisplayMod(powerTypeToCheck)" or "UnitPower(concernedUnit, powerType, powerThirdArg) / WeakAuras.UnitPowerDisplayMod(powerTypeToCheck)",
+        init = "UnitPower(concernedUnit, powerType, powerThirdArg) / WeakAuras.UnitPowerDisplayMod(powerTypeToCheck)",
         store = true,
         conditionType = "number"
       },
@@ -1757,7 +1547,7 @@ WeakAuras.event_prototypes = {
         name = "percentpower",
         display = L["Power (%)"],
         type = "number",
-        init = WeakAuras.IsClassic() and "powerType == 4 and (GetComboPoints(unit, 'target') / math.max(1, UnitPowerMax(unit, 14)) * 100) or (power or 0) / math.max(1, UnitPowerMax(concernedUnit, powerType, powerThirdArg)) * 100" or "(power or 0) / math.max(1, UnitPowerMax(concernedUnit, powerType, powerThirdArg)) * 100 * WeakAuras.UnitPowerDisplayMod(powerTypeToCheck)",
+        init = "(power or 0) / math.max(1, UnitPowerMax(concernedUnit, powerType, powerThirdArg)) * 100 * WeakAuras.UnitPowerDisplayMod(powerTypeToCheck)",
         store = true,
         conditionType = "number"
       },
@@ -1769,14 +1559,11 @@ WeakAuras.event_prototypes = {
     durationFunc = function(trigger)
       local powerType = trigger.use_powertype and trigger.powertype or nil;
       if powerType == 99 then
-        if WeakAuras.IsClassic() then return end
         if trigger.use_scaleStagger and trigger.scaleStagger then
           return UnitStagger(trigger.unit), math.max(1, UnitHealthMax(trigger.unit) * trigger.scaleStagger), "fastUpdate";
         else
           return UnitStagger(trigger.unit), math.max(1, UnitHealthMax(trigger.unit)), "fastUpdate";
         end
-      elseif (WeakAuras.IsClassic() and powerType == 4) then -- combo points
-        return GetComboPoints(trigger.unit, "target"), UnitPowerMax(trigger.unit, 14), true
       end
       local powerTypeToCheck = trigger.powertype or UnitPowerType(trigger.unit);
       local pdm = WeakAuras.UnitPowerDisplayMod(powerTypeToCheck);
@@ -1801,7 +1588,6 @@ WeakAuras.event_prototypes = {
     stacksFunc = function(trigger)
       local powerType = trigger.use_powertype and trigger.powertype or nil;
       if powerType == 99 then
-        if WeakAuras.IsClassic() then return end
         return UnitStagger(trigger.unit);
       end
       local powerTypeToCheck = trigger.powertype or UnitPowerType(trigger.unit);
@@ -2093,17 +1879,11 @@ WeakAuras.event_prototypes = {
         type = "string",
         init = "arg",
         enable = function(trigger)
-          return not WeakAuras.IsClassic() and trigger.subeventPrefix and (trigger.subeventPrefix:find("SPELL") or trigger.subeventPrefix == "RANGE" or trigger.subeventPrefix:find("DAMAGE"))
+          return trigger.subeventPrefix and (trigger.subeventPrefix:find("SPELL") or trigger.subeventPrefix == "RANGE" or trigger.subeventPrefix:find("DAMAGE"))
         end,
-        hidden = WeakAuras.IsClassic(),
         store = true,
         conditionType = "number"
       },
-      {
-        enable = function(trigger)
-          return WeakAuras.IsClassic() and trigger.subeventPrefix and (trigger.subeventPrefix:find("SPELL") or trigger.subeventPrefix == "RANGE" or trigger.subeventPrefix:find("DAMAGE"))
-        end
-      }, -- spellId ignored on classic
       {
         name = "spellName",
         display = L["Spell Name"],
@@ -4084,20 +3864,9 @@ WeakAuras.event_prototypes = {
   },
   ["Talent Known"] = {
     type = "status",
-    events = function()
-      local events
-      if WeakAuras.IsClassic() then
-        events = {
-          "CHARACTER_POINTS_CHANGED",
-          "SPELLS_CHANGED"
-        }
-      else
-        events = { "PLAYER_TALENT_UPDATE" }
-      end
-      return {
-        ["events"] = events
-      }
-    end,
+    events = {
+      ["events"] = { "PLAYER_TALENT_UPDATE" }
+    },
     force_events = "PLAYER_TALENT_UPDATE",
     name = L["Talent Selected"],
     init = function(trigger)
@@ -4105,26 +3874,14 @@ WeakAuras.event_prototypes = {
       if (trigger.use_talent) then
         -- Single selection
         local index = trigger.talent and trigger.talent.single;
-        local tier, column
-        if WeakAuras.IsClassic() then
-          tier = index and ceil(index / 20)
-          column = index and ((index - 1) % 20 + 1)
-        else
-          tier = index and ceil(index / 3)
-          column = index and ((index - 1) % 3 + 1)
-        end
+        local tier = index and ceil(index / 3)
+        local column = index and ((index - 1) % 3 + 1)
 
         local ret = [[
           local tier = %s;
           local column = %s;
-          local active, _, activeName, activeIcon, selected, known, rank
-          if WeakAuras.IsClassic() then
-            _, _, _, _, rank  = GetTalentInfo(tier, column)
-            active = rank > 0
-          else
-            _, activeName, activeIcon, selected, _, _, _, _, _, _, known  = GetTalentInfo(tier, column, 1)
-            active = selected or known;
-          end
+          local _, activeName, activeIcon, selected, _, _, _, _, _, _, known  = GetTalentInfo(tier, column, 1)
+          active = selected or known;
         ]]
         if (inverse) then
           ret = ret .. [[
@@ -4142,32 +3899,19 @@ WeakAuras.event_prototypes = {
             local activeName;
           ]]
           for index in pairs(trigger.talent.multi) do
-            local tier, column
-            if WeakAuras.IsClassic() then
-              tier = index and ceil(index / 20)
-              column = index and ((index - 1) % 20 + 1)
-            else
-              tier = index and ceil(index / 3)
-              column = index and ((index - 1) % 3 + 1)
-            end
+            local tier = index and ceil(index / 3)
+            local column = index and ((index - 1) % 3 + 1)
+
             local ret2 = [[
               if (not active) then
                 tier = %s
                 column = %s
-                if WeakAuras.IsClassic() then
-                  local name, icon, _, _, rank  = GetTalentInfo(tier, column)
-                  if rank > 0 then
-                    active = true;
-                    activeName = name;
-                    activeIcon = icon;
-                  end
-                else
-                  local _, name, icon, selected, _, _, _, _, _, _, known  = GetTalentInfo(tier, column, 1)
-                  if (selected or known) then
-                    active = true;
-                    activeName = name;
-                    activeIcon = icon;
-                  end
+                
+                local _, name, icon, selected, _, _, _, _, _, _, known  = GetTalentInfo(tier, column, 1)
+                if (selected or known) then
+                  active = true;
+                  activeName = name;
+                  activeIcon = icon;
                 end
               end
             ]]
@@ -4190,11 +3934,9 @@ WeakAuras.event_prototypes = {
         type = "multiselect",
         values = function()
           local class = select(2, UnitClass("player"));
-          local spec =  not WeakAuras.IsClassic() and GetSpecialization();
+          local spec = GetSpecialization();
           if(WeakAuras.talent_types_specific[class] and  WeakAuras.talent_types_specific[class][spec]) then
             return WeakAuras.talent_types_specific[class][spec];
-          elseif WeakAuras.IsClassic() and WeakAuras.talent_types_specific[class] then
-            return WeakAuras.talent_types_specific[class];
           else
             return WeakAuras.talent_types;
           end
@@ -4493,18 +4235,8 @@ WeakAuras.event_prototypes = {
         -- Single selection
         ret = ret .. [[
           local trigger_form = %d
-          if WeakAuras.IsClassic() then
-            for i=1, GetNumShapeshiftForms() do
-              local _, isActive = GetShapeshiftFormInfo(i)
-              if isActive then
-                form = i
-                active = i == trigger_form
-              end
-            end
-          else
-            form = GetShapeshiftForm()
-            active = form == trigger_form
-          end
+          form = GetShapeshiftForm()
+          active = form == trigger_form
         ]]
         if inverse then
           ret = ret .. [[
@@ -4517,17 +4249,9 @@ WeakAuras.event_prototypes = {
           local ret2 = [[
             if not active then
               local index = %d
-              if WeakAuras.IsClassic() then
-                local _, isActive = GetShapeshiftFormInfo(index)
-                if isActive then
-                  form = index
-                  active = true
-                end
-              else
-                if GetShapeshiftForm() == index then
-                  form = index
-                  active = true
-                end
+              if GetShapeshiftForm() == index then
+                form = index
+                active = true
               end
             end
           ]]
@@ -4541,17 +4265,8 @@ WeakAuras.event_prototypes = {
         return ret
       elseif trigger.use_form == nil then
         ret = ret .. [[
-          if WeakAuras.IsClassic() then
-            for i=1, GetNumShapeshiftForms() do
-              local _, isActive = GetShapeshiftFormInfo(i)
-              if isActive then
-                form = i
-                break
-              end
-            end
-          else
-            form = GetShapeshiftForm()
-          end
+          form = GetShapeshiftForm()
+          
           active = true
         ]]
         return ret
@@ -4596,18 +4311,9 @@ WeakAuras.event_prototypes = {
     end,
     iconFunc = function(trigger)
       local icon = "136116"
-      if WeakAuras.IsClassic() then
-        for i=1, GetNumShapeshiftForms() do
-          local texture, isActive = GetShapeshiftFormInfo(i)
-          if isActive then
-            icon = texture
-          end
-        end
-      else
-        local form = GetShapeshiftForm()
-        if form and form > 0 then
-          icon = GetShapeshiftFormInfo(form);
-        end
+      local form = GetShapeshiftForm()
+      if form and form > 0 then
+        icon = GetShapeshiftFormInfo(form);
       end
       return icon or "136116"
     end,
@@ -4620,7 +4326,7 @@ WeakAuras.event_prototypes = {
       "TENCH_UPDATE",
     },
     force_events = "TENCH_UPDATE",
-    name = WeakAuras.IsClassic() and L["Weapon Enchant"] or L["Fishing Lure / Weapon Enchant (Old)"],
+    name = L["Fishing Lure / Weapon Enchant (Old)"],
     init = function(trigger)
       WeakAuras.TenchInit();
 
@@ -4670,14 +4376,6 @@ WeakAuras.event_prototypes = {
         desc = L["Enchant Name or ID"],
         type = "string",
         test = "true"
-      },
-      {
-        name = "stack",
-        display = L["Stack Count"],
-        type = "number",
-        test = "true",
-        enable = WeakAuras.IsClassic(),
-        hidden = not WeakAuras.IsClassic()
       },
       {
         name = "remaining",
@@ -5088,26 +4786,22 @@ WeakAuras.event_prototypes = {
         required = true,
         validate = WeakAuras.ValidateNumeric,
         desc = function()
-          if not WeakAuras.IsClassic() then
-            local classFilter, specFilter = C_LootJournal.GetClassAndSpecFilters();
-            local currentClass = select(3, UnitClass("player"));
-            local specID = GetSpecializationInfo(GetSpecialization());
+          local classFilter, specFilter = C_LootJournal.GetClassAndSpecFilters();
+          local currentClass = select(3, UnitClass("player"));
+          local specID = GetSpecializationInfo(GetSpecialization());
 
-            C_LootJournal.SetClassAndSpecFilters(currentClass, specID);
-            local sets = C_LootJournal.GetFilteredItemSets();
-            C_LootJournal.SetClassAndSpecFilters(classFilter, specFilter);
+          C_LootJournal.SetClassAndSpecFilters(currentClass, specID);
+          local sets = C_LootJournal.GetFilteredItemSets();
+          C_LootJournal.SetClassAndSpecFilters(classFilter, specFilter);
 
-            local description = "";
-            for index, set in ipairs(sets) do
-              description = description .. set.name .. ": " .. set.setID .. "\n";
-            end
-
-            description = description .. "\n" .. L["Older set IDs can be found on websites such as wowhead.com/item-sets"];
-
-            return description;
-          else
-            return L["Set IDs can be found on websites such as classic.wowhead.com/item-sets"]
+          local description = "";
+          for index, set in ipairs(sets) do
+            description = description .. set.name .. ": " .. set.setID .. "\n";
           end
+
+          description = description .. "\n" .. L["Older set IDs can be found on websites such as wowhead.com/item-sets"];
+
+          return description;
         end
       },
       {
@@ -5282,15 +4976,6 @@ WeakAuras.event_prototypes = {
       AddUnitEventForEvents(result, trigger.unit, "UNIT_SPELLCAST_INTERRUPTIBLE")
       AddUnitEventForEvents(result, trigger.unit, "UNIT_SPELLCAST_NOT_INTERRUPTIBLE")
       AddUnitEventForEvents(result, trigger.unit, "UNIT_SPELLCAST_INTERRUPTED")
-      if WeakAuras.IsClassic() and trigger.unit ~= "player" then
-        LibClassicCasterino.RegisterCallback("WeakAuras", "UNIT_SPELLCAST_START", WeakAuras.ScanUnitEvents)
-        LibClassicCasterino.RegisterCallback("WeakAuras", "UNIT_SPELLCAST_DELAYED", WeakAuras.ScanUnitEvents) -- only for player
-        LibClassicCasterino.RegisterCallback("WeakAuras", "UNIT_SPELLCAST_STOP", WeakAuras.ScanUnitEvents)
-        LibClassicCasterino.RegisterCallback("WeakAuras", "UNIT_SPELLCAST_CHANNEL_START", WeakAuras.ScanUnitEvents)
-        LibClassicCasterino.RegisterCallback("WeakAuras", "UNIT_SPELLCAST_CHANNEL_UPDATE", WeakAuras.ScanUnitEvents) -- only for player
-        LibClassicCasterino.RegisterCallback("WeakAuras", "UNIT_SPELLCAST_CHANNEL_STOP", WeakAuras.ScanUnitEvents)
-        LibClassicCasterino.RegisterCallback("WeakAuras", "UNIT_SPELLCAST_INTERRUPTED", WeakAuras.ScanUnitEvents)
-      end
       AddUnitEventForEvents(result, trigger.unit, "UNIT_TARGET")
       if trigger.use_destUnit and trigger.destUnit and trigger.destUnit ~= "" then
         AddUnitEventForEvents(result, trigger.destUnit, "UNIT_TARGET")
@@ -5300,12 +4985,6 @@ WeakAuras.event_prototypes = {
     end,
     internal_events = function(trigger)
       local result = {"CAST_REMAINING_CHECK", "WA_DELAYED_PLAYER_ENTERING_WORLD"}
-      if WeakAuras.IsClassic() and trigger.unit ~= "player" then
-        tinsert(result, "PLAYER_TARGET_CHANGED")
-        tinsert(result, "UNIT_SPELLCAST_START")
-        tinsert(result, "UNIT_SPELLCAST_DELAYED")
-        tinsert(result, "UNIT_SPELLCAST_CHANNEL_START")
-      end
       AddUnitChangeInternalEvents(trigger.unit, result)
       return result
     end,
@@ -5351,11 +5030,11 @@ WeakAuras.event_prototypes = {
             then
               show = false
             else
-              spell, _, icon, startTime, endTime, _, _, interruptible, spellId = WeakAuras.UnitCastingInfo(sourceUnit)
+              spell, _,_, icon, startTime, endTime, _, _, interruptible, spellId = WeakAuras.UnitCastingInfo(sourceUnit)
               if spell then
                 castType = "cast"
               else
-                spell, _, icon, startTime, endTime, _, interruptible, spellId = WeakAuras.UnitChannelInfo(sourceUnit)
+                spell, _,_, icon, startTime, endTime, _, interruptible, spellId = WeakAuras.UnitChannelInfo(sourceUnit)
                 if spell then
                   castType = "channel"
                 end
@@ -5572,10 +5251,7 @@ WeakAuras.event_prototypes = {
     end,
     init = function()
       local ret = [[
-        local main_stat
-        if not WeakAuras.IsClassic() then
-          _, _, _, _, _, main_stat = GetSpecializationInfo(GetSpecialization() or 0)
-        end
+        local _, _, _, _, _, main_stat = GetSpecializationInfo(GetSpecialization() or 0)
       ]]
       return ret;
     end,
@@ -5588,39 +5264,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "UnitStat('player', main_stat or 1)",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
-      },
-      {
-        name = "strength",
-        display = L["Strength"],
-        type = "number",
-        init = "UnitStat('player', LE_UNIT_STAT_STRENGTH)",
-        store = true,
-        enable = WeakAuras.IsClassic(),
-        conditionType = "number",
-        hidden = not WeakAuras.IsClassic()
-      },
-      {
-        name = "agility",
-        display = L["Agility"],
-        type = "number",
-        init = "UnitStat('player', LE_UNIT_STAT_AGILITY)",
-        store = true,
-        enable = WeakAuras.IsClassic(),
-        conditionType = "number",
-        hidden = not WeakAuras.IsClassic()
-      },
-     {
-        name = "intellect",
-        display = L["Intellect"],
-        type = "number",
-        init = "UnitStat('player', LE_UNIT_STAT_INTELLECT)",
-        store = true,
-        enable = WeakAuras.IsClassic(),
-        conditionType = "number",
-        hidden = not WeakAuras.IsClassic()
       },
       {
         name = "stamina",
@@ -5636,9 +5280,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetCombatRating(CR_CRIT_SPELL)",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "criticalpercent",
@@ -5654,9 +5296,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetCombatRating(CR_HASTE_SPELL)",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "hastepercent",
@@ -5672,9 +5312,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetCombatRating(CR_MASTERY)",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "masterypercent",
@@ -5682,9 +5320,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetMasteryEffect()",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "versatilityrating",
@@ -5692,9 +5328,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetCombatRating(CR_VERSATILITY_DAMAGE_DONE)",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "versatilitypercent",
@@ -5702,69 +5336,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_DONE) + GetVersatilityBonus(CR_VERSATILITY_DAMAGE_DONE)",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
-      },
-      {
-        name = "resistanceholy",
-        display = L["Holy Resistance"],
-        type = "number",
-        init = "select(2, UnitResistance('player', 1))",
-        store = true,
-        enable = WeakAuras.IsClassic(),
-        conditionType = "number",
-        hidden = not WeakAuras.IsClassic()
-      },
-      {
-        name = "resistancefire",
-        display = L["Fire Resistance"],
-        type = "number",
-        init = "select(2, UnitResistance('player', 2))",
-        store = true,
-        enable = WeakAuras.IsClassic(),
-        conditionType = "number",
-        hidden = not WeakAuras.IsClassic()
-      },
-      {
-        name = "resistancenature",
-        display = L["Nature Resistance"],
-        type = "number",
-        init = "select(2, UnitResistance('player', 3))",
-        store = true,
-        enable = WeakAuras.IsClassic(),
-        conditionType = "number",
-        hidden = not WeakAuras.IsClassic()
-      },
-      {
-        name = "resistancefrost",
-        display = L["Frost Resistance"],
-        type = "number",
-        init = "select(2, UnitResistance('player', 4))",
-        store = true,
-        enable = WeakAuras.IsClassic(),
-        conditionType = "number",
-        hidden = not WeakAuras.IsClassic()
-      },
-      {
-        name = "resistanceshadow",
-        display = L["Shadow Resistance"],
-        type = "number",
-        init = "select(2, UnitResistance('player', 5))",
-        store = true,
-        enable = WeakAuras.IsClassic(),
-        conditionType = "number",
-        hidden = not WeakAuras.IsClassic()
-      },
-      {
-        name = "resistancearcane",
-        display = L["Arcane Resistance"],
-        type = "number",
-        init = "select(2, UnitResistance('player', 6))",
-        store = true,
-        enable = WeakAuras.IsClassic(),
-        conditionType = "number",
-        hidden = not WeakAuras.IsClassic()
       },
       {
         name = "leechrating",
@@ -5772,9 +5344,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetCombatRating(CR_LIFESTEAL)",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "leechpercent",
@@ -5782,9 +5352,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetLifesteal()",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "movespeedrating",
@@ -5792,9 +5360,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetCombatRating(CR_SPEED)",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "movespeedpercent",
@@ -5810,9 +5376,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetCombatRating(CR_AVOIDANCE)",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "avoidancepercent",
@@ -5820,9 +5384,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetAvoidance()",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "dodgerating",
@@ -5830,9 +5392,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetCombatRating(CR_DODGE)",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "dodgepercent",
@@ -5848,9 +5408,7 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "GetCombatRating(CR_PARRY)",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "parrypercent",
@@ -5872,11 +5430,9 @@ WeakAuras.event_prototypes = {
         name = "blocktargetpercent",
         display = L["Block against Target (%)"],
         type = "number",
-        init = "PaperDollFrame_GetArmorReductionAgainstTarget(GetShieldBlock())",
+        init = "PaperDollFrame_GetArmorReduction(GetShieldBlock(),UnitLevel(\"target\"))",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "armorrating",
@@ -5892,19 +5448,15 @@ WeakAuras.event_prototypes = {
         type = "number",
         init = "PaperDollFrame_GetArmorReduction(select(2, UnitArmor('player')), UnitEffectiveLevel('player'))",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "armortargetpercent",
         display = L["Armor against Target (%)"],
         type = "number",
-        init = "PaperDollFrame_GetArmorReductionAgainstTarget(select(2, UnitArmor('player')))",
+        init = "PaperDollFrame_GetArmorReduction(select(2, UnitArmor('player')), UnitLevel(\"target\"))",
         store = true,
-        enable = not WeakAuras.IsClassic(),
         conditionType = "number",
-        hidden = WeakAuras.IsClassic()
       },
     },
     automaticrequired = true
@@ -5936,7 +5488,7 @@ WeakAuras.event_prototypes = {
       end
       local unit_events = {}
       local pet_unit_events = {}
-      if not WeakAuras.IsClassic() and trigger.use_vehicle ~= nil then
+      if trigger.use_vehicle ~= nil then
         tinsert(unit_events, "UNIT_ENTERED_VEHICLE")
         tinsert(unit_events, "UNIT_EXITED_VEHICLE")
         tinsert(events, "PLAYER_ENTERING_WORLD")
@@ -6011,8 +5563,6 @@ WeakAuras.event_prototypes = {
         display = L["PvP Flagged"],
         type = "tristate",
         init = "UnitIsPVP('player')",
-        enable = not WeakAuras.IsClassic(),
-        hidden = WeakAuras.IsClassic()
       },
       {
         name = "alive",
@@ -6024,9 +5574,7 @@ WeakAuras.event_prototypes = {
         name = "vehicle",
         display = L["In Vehicle"],
         type = "tristate",
-        init = "not WeakAuras.IsClassic() and UnitInVehicle('player')",
-        enable = not WeakAuras.IsClassic(),
-        hidden = WeakAuras.IsClassic()
+        init = "UnitInVehicle('player')",
       },
       {
         name = "resting",
@@ -6075,8 +5623,6 @@ WeakAuras.event_prototypes = {
         type = "multiselect",
         values = "difficulty_types",
         init = "WeakAuras.InstanceDifficulty()",
-        enable = not WeakAuras.IsClassic(),
-        hidden = WeakAuras.IsClassic(),
       },
     },
     automaticrequired = true
@@ -6180,14 +5726,8 @@ WeakAuras.event_prototypes = {
                 activeIcon = _G[i];
               end
               index = index + 1
-              if WeakAuras.IsClassic() then
-                if name == "PET_MODE_AGGRESSIVE" and active == true then
-                  behavior = "aggressive"
-                end
-              else
-                if name == "PET_MODE_ASSIST" and active == true then
-                  behavior = "assist"
-                end
+              if name == "PET_MODE_ASSIST" and active == true then
+                behavior = "assist"
               end
               if name == "PET_MODE_DEFENSIVE" and active == true then
                 behavior = "defensive"
@@ -6365,15 +5905,7 @@ WeakAuras.event_prototypes = {
 
 };
 
-if WeakAuras.IsClassic() then
-  WeakAuras.event_prototypes["Threat Situation"] = nil
-  WeakAuras.event_prototypes["Death Knight Rune"] = nil
-  WeakAuras.event_prototypes["Alternate Power"] = nil
-  WeakAuras.event_prototypes["Equipment Set"] = nil
-  WeakAuras.event_prototypes["Spell Activation Overlay"] = nil
-else
-  WeakAuras.event_prototypes["Queued Action"] = nil
-end
+WeakAuras.event_prototypes["Queued Action"] = nil
 
 WeakAuras.dynamic_texts = {
   ["p"] = {

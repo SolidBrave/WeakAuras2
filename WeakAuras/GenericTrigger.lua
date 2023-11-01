@@ -73,10 +73,6 @@ local aceEvents = WeakAurasAceEvents
 local WeakAuras = WeakAuras;
 local L = WeakAuras.L;
 local GenericTrigger = {};
-local LCSA
-if WeakAuras.IsClassic() then
-  LCSA = LibStub("LibClassicSpellActionCount-1.0")
-end
 
 local event_prototypes = WeakAuras.event_prototypes;
 
@@ -602,27 +598,14 @@ function WeakAuras.ScanEvents(event, arg1, arg2, ...)
   local orgEvent = event;
   WeakAuras.StartProfileSystem("generictrigger " .. orgEvent )
   local event_list = loaded_events[event];
-  if (not event_list) then
-    WeakAuras.StopProfileSystem("generictrigger " .. orgEvent )
-    return
-  end
   if(event == "COMBAT_LOG_EVENT_UNFILTERED") then
-    local arg1, arg2 = CombatLogGetCurrentEventInfo();
-
-    event_list = event_list[arg2];
-    if (not event_list) then
-      WeakAuras.StopProfileSystem("generictrigger " .. orgEvent )
-      return;
-    end
-    WeakAuras.ScanEventsInternal(event_list, event, CombatLogGetCurrentEventInfo());
-
-  elseif (event == "COMBAT_LOG_EVENT_UNFILTERED_CUSTOM") then
+    event_list = event_list and event_list[arg2];
+  end
+  if(event_list) then
     -- This reverts the COMBAT_LOG_EVENT_UNFILTERED_CUSTOM workaround so that custom triggers that check the event argument will work as expected
     if(event == "COMBAT_LOG_EVENT_UNFILTERED_CUSTOM") then
       event = "COMBAT_LOG_EVENT_UNFILTERED";
     end
-    WeakAuras.ScanEventsInternal(event_list, event, CombatLogGetCurrentEventInfo());
-  else
     WeakAuras.ScanEventsInternal(event_list, event, arg1, arg2, ...);
   end
   WeakAuras.StopProfileSystem("generictrigger " .. orgEvent )
@@ -751,12 +734,18 @@ function HandleEvent(frame, event, arg1, arg2, ...)
   WeakAuras.StartProfileSystem("generictrigger " .. event);
   if not(WeakAuras.IsPaused()) then
     if(event == "COMBAT_LOG_EVENT_UNFILTERED") then
-      WeakAuras.ScanEvents(event);
+      if(loaded_events[event] and loaded_events[event][arg2]) then
+        WeakAuras.ScanEvents(event, arg1, arg2, ...);
+      end
       -- This triggers the scanning of "hacked" COMBAT_LOG_EVENT_UNFILTERED events that were renamed in order to circumvent
       -- the "proper" COMBAT_LOG_EVENT_UNFILTERED checks
-      WeakAuras.ScanEvents("COMBAT_LOG_EVENT_UNFILTERED_CUSTOM");
+      if(loaded_events["COMBAT_LOG_EVENT_UNFILTERED_CUSTOM"]) then
+        WeakAuras.ScanEvents("COMBAT_LOG_EVENT_UNFILTERED_CUSTOM", arg1, arg2, ...);
+      end
     else
-      WeakAuras.ScanEvents(event, arg1, arg2, ...);
+      if(loaded_events[event]) then
+        WeakAuras.ScanEvents(event, arg1, arg2, ...);
+      end
     end
   end
   if (event == "PLAYER_ENTERING_WORLD") then
@@ -765,18 +754,14 @@ function HandleEvent(frame, event, arg1, arg2, ...)
       HandleEvent(frame, "WA_DELAYED_PLAYER_ENTERING_WORLD");
       WeakAuras.CheckCooldownReady();
       WeakAuras.StopProfileSystem("generictrigger WA_DELAYED_PLAYER_ENTERING_WORLD");
-      if not WeakAuras.IsClassic() then
-        WeakAuras.PreShowModels() -- models are disabled for classic
-      end
+      WeakAuras.PreShowModels()
     end,
     0.8);  -- Data not available
 
-    if not WeakAuras.IsClassic() then
-      timer:ScheduleTimer(function()
-        WeakAuras.PreShowModels()
-      end,
-      4);  -- Data not available
-    end
+    timer:ScheduleTimer(function()
+      WeakAuras.PreShowModels()
+    end,
+    4);  -- Data not available
   end
   WeakAuras.StopProfileSystem("generictrigger " .. event);
 end
@@ -1495,7 +1480,6 @@ end
 do
   local mh = GetInventorySlotInfo("MainHandSlot")
   local oh = GetInventorySlotInfo("SecondaryHandSlot")
-  local ranged = WeakAuras.IsClassic() and GetInventorySlotInfo("RangedSlot")
 
   local swingTimerFrame;
   local lastSwingMain, lastSwingOff, lastSwingRange;
@@ -1510,7 +1494,7 @@ do
       local name, _, _, _, _, _, _, _, _, icon = GetItemInfo(itemId or 0);
       if(lastSwingMain) then
         return swingDurationMain, lastSwingMain + swingDurationMain - mainSwingOffset, name, icon;
-      elseif not WeakAuras.IsClassic() and lastSwingRange then
+      elseif lastSwingRange then
         return swingDurationRange, lastSwingRange + swingDurationRange, name, icon;
       else
         return 0, math.huge, name, icon;
@@ -1520,14 +1504,6 @@ do
       local name, _, _, _, _, _, _, _, _, icon = GetItemInfo(itemId or 0);
       if(lastSwingOff) then
         return swingDurationOff, lastSwingOff + swingDurationOff, name, icon;
-      else
-        return 0, math.huge, name, icon;
-      end
-    elseif(hand == "ranged") then
-      local itemId = GetInventoryItemID("player", ranged);
-      local name, _, _, _, _, _, _, _, _, icon = GetItemInfo(itemId or 0);
-      if (lastSwingRange) then
-        return swingDurationRange, lastSwingRange + swingDurationRange, name, icon;
       else
         return 0, math.huge, name, icon;
       end
@@ -1541,8 +1517,6 @@ do
       lastSwingMain, swingDurationMain, mainSwingOffset = nil, nil, nil;
     elseif(hand == "off") then
       lastSwingOff, swingDurationOff = nil, nil;
-    elseif(hand == "ranged") then
-      lastSwingRange, swingDurationRange = nil, nil;
     end
     WeakAuras.ScanEvents("SWING_TIMER_END");
   end
@@ -1639,22 +1613,17 @@ do
         local currentTime = GetTime();
         local speed = UnitRangedDamage("player");
         if(lastSwingRange) then
-          if WeakAuras.IsClassic() then
-            timer:CancelTimer(rangeTimer, true)
-          else
-            timer:CancelTimer(mainTimer, true)
-          end
+          timer:CancelTimer(mainTimer, true)
+
           event = "SWING_TIMER_CHANGE";
         else
           event = "SWING_TIMER_START";
         end
         lastSwingRange = currentTime;
         swingDurationRange = speed;
-        if WeakAuras.IsClassic() then
-          rangeTimer = timer:ScheduleTimerFixed(swingEnd, speed, "ranged");
-        else
-          mainTimer = timer:ScheduleTimerFixed(swingEnd, speed, "main");
-        end
+
+        mainTimer = timer:ScheduleTimerFixed(swingEnd, speed, "main");
+
         WeakAuras.ScanEvents(event);
       end
     end
@@ -1671,7 +1640,7 @@ do
       swingTimerFrame:SetScript("OnEvent",
         function(_, event, ...)
           if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-            swingTimerCLEUCheck(CombatLogGetCurrentEventInfo())
+            swingTimerCLEUCheck(...)
           else
             swingTimerCheck(event, ...)
           end
@@ -1730,13 +1699,8 @@ do
 
   local function CheckGCD()
     local event;
-    local startTime, duration
-    if WeakAuras.IsClassic() then
-      startTime, duration = GetSpellCooldown(29515);
-      shootStart, shootDuration = GetSpellCooldown(5019)
-    else
-      startTime, duration = GetSpellCooldown(61304);
-    end
+    local startTime, duration = GetSpellCooldown(61304);
+
     if(duration and duration > 0) then
       if not(gcdStart) then
         event = "GCD_START";
@@ -1813,9 +1777,7 @@ do
     end
 
     if duration > 0 then
-      if (startTime == gcdStart and duration == gcdDuration)
-          or (WeakAuras.IsClassic() and duration == shootDuration and startTime == shootStart)
-      then
+      if startTime == gcdStart and duration == gcdDuration then
         -- GCD cooldown, this could mean that the spell reset!
         if self.expirationTime[id] and self.expirationTime[id] > endTime and self.expirationTime[id] ~= 0 then
           self.duration[id] = 0
@@ -1865,11 +1827,9 @@ do
   function WeakAuras.InitCooldownReady()
     cdReadyFrame = CreateFrame("FRAME");
     WeakAuras.frames["Cooldown Trigger Handler"] = cdReadyFrame
-    if not WeakAuras.IsClassic() then
-      cdReadyFrame:RegisterEvent("RUNE_POWER_UPDATE");
-      cdReadyFrame:RegisterEvent("PLAYER_TALENT_UPDATE");
-      cdReadyFrame:RegisterEvent("PLAYER_PVP_TALENT_UPDATE");
-    end
+    cdReadyFrame:RegisterEvent("RUNE_POWER_UPDATE");
+    cdReadyFrame:RegisterEvent("PLAYER_TALENT_UPDATE");
+    cdReadyFrame:RegisterEvent("PLAYER_PVP_TALENT_UPDATE");
     cdReadyFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN");
     cdReadyFrame:RegisterEvent("SPELL_UPDATE_CHARGES");
     cdReadyFrame:RegisterEvent("UNIT_SPELLCAST_SENT");
@@ -2123,12 +2083,7 @@ do
       end
     end
 
-    local count
-    if WeakAuras.IsClassic() then
-      count = LCSA:GetSpellReagentCount(id)
-    else
-      count = GetSpellCount(id)
-    end
+    local count = GetSpellCount(id)
 
     return charges, maxCharges, startTime, duration, unifiedCooldownBecauseRune,
            startTimeCooldown, durationCooldown, cooldownBecauseRune, startTimeCharges, durationCharges,
@@ -2359,7 +2314,7 @@ do
 
     if not id or id == 0 then return end
 
-    if ignoreRunes and not WeakAuras.IsClassic() then
+    if ignoreRunes then
       for i = 1, 6 do
         WeakAuras.WatchRuneCooldown(i);
       end
@@ -2487,9 +2442,7 @@ function WeakAuras.WatchUnitChange(unit)
     watchUnitChange = CreateFrame("FRAME");
     WeakAuras.frames["Unit Change Frame"] = watchUnitChange;
     watchUnitChange:RegisterEvent("PLAYER_TARGET_CHANGED")
-    if not WeakAuras.IsClassic() then
-      watchUnitChange:RegisterEvent("PLAYER_FOCUS_CHANGED");
-    end
+    watchUnitChange:RegisterEvent("PLAYER_FOCUS_CHANGED");
     watchUnitChange:RegisterEvent("UNIT_TARGET");
     watchUnitChange:RegisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT");
     watchUnitChange:RegisterEvent("GROUP_ROSTER_UPDATE");

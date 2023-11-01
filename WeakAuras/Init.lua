@@ -6,17 +6,17 @@ WeakAuras.halfWidth = WeakAuras.normalWidth / 2
 WeakAuras.doubleWidth = WeakAuras.normalWidth * 2
 
 local versionStringFromToc = GetAddOnMetadata("WeakAuras", "Version")
-local versionString = "@project-version@"
-local buildTime = "@build-time@"
+local versionString = "2.16.3"
+local buildTime = "20200205025918"
 
 local isDevVersion = false
---@debug@
-if versionStringFromToc == "@project-version@" then
+--[===[@debug@
+if versionStringFromToc == "2.16.3" then
   versionStringFromToc = "Dev"
   buildTime = "Dev"
   isDevVersion = true
 end
---@end-debug@
+--@end-debug@]===]
 
 local intendedWoWProject = WOW_PROJECT_MAINLINE
 --[===[@non-retail@
@@ -30,7 +30,7 @@ WeakAuras.newFeatureString = "|TInterface\\OptionsFrame\\UI-OptionsFrame-NewFeat
 WeakAuras.BuildInfo = select(4, GetBuildInfo())
 
 function WeakAuras.IsClassic()
-  return WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
+  return false
 end
 
 function WeakAuras.IsCorrectVersion()

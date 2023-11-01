@@ -4,6 +4,9 @@ local WeakAuras = WeakAuras;
 local L = WeakAuras.L;
 
 local LSM = LibStub("LibSharedMedia-3.0");
+local LibBabbleRace = LibStub("LibBabble-Race-3.0");
+local LBR_Locale = LibBabbleRace:GetUnstrictLookupTable()
+local LBR_Base = LibBabbleRace:GetBaseLookupTable();
 
 local wipe, tinsert = wipe, tinsert
 local GetNumShapeshiftForms, GetShapeshiftFormInfo = GetNumShapeshiftForms, GetShapeshiftFormInfo
@@ -198,44 +201,38 @@ WeakAuras.unit_threat_situation_types = {
 WeakAuras.class_types = {}
 WeakAuras.class_color_types = {} -- TODO: it should be removed together with Bufftrigger (unused)
 for classID = 1, 20 do -- 20 is for GetNumClasses() but that function doesn't exists on Classic
-  local classInfo = C_CreatureInfo.GetClassInfo(classID)
-  if classInfo then
-    if WeakAuras.IsClassic() then
-      WeakAuras.class_types[classInfo.classFile] = WrapTextInColorCode(classInfo.className, select(4, GetClassColor(classInfo.classFile)))
-      WeakAuras.class_color_types[classInfo.classFile] = select(4, GetClassColor(classInfo.classFile))
-    else
-      WeakAuras.class_types[classInfo.classFile] = C_ClassColor.GetClassColor(classInfo.classFile):WrapTextInColorCode(classInfo.className)
-      WeakAuras.class_color_types[classInfo.classFile] = C_ClassColor.GetClassColor(classInfo.classFile):GenerateHexColorMarkup()
-    end
+  local className, classFile, classID = GetClassInfo(classID)
+  if className then
+    WeakAuras.class_types[classFile] = WrapTextInColorCode(className, select(4, GetClassColor(classFile)))
+    WeakAuras.class_color_types[classFile] = select(4, GetClassColor(classFile))
   end
 end
 
-WeakAuras.race_types = {}
-do
-  local unplayableRace = {
-    [12] = true,
-    [13] = true,
-    [14] = true,
-    [15] = true,
-    [16] = true,
-    [17] = true,
-    [18] = true,
-    [19] = true,
-    [20] = true,
-    [21] = true,
-    [23] = true,
-    [33] = true
-  }
-  local raceID = 1
-  local raceInfo = C_CreatureInfo.GetRaceInfo(raceID)
-  while raceInfo do
-    if not unplayableRace[raceID] then
-      WeakAuras.race_types[raceInfo.clientFileString] = raceInfo.raceName
-    end
-    raceID = raceID + 1
-    raceInfo = C_CreatureInfo.GetRaceInfo(raceID)
-  end
+local function LBR(key)
+  return LBR_Locale[key] or LBR_Base[key];
 end
+
+WeakAuras.race_types = {
+  Pandaren = LBR("Pandaren"),
+  Worgen = LBR("Worgen"),
+  Draenei = LBR("Draenei"),
+  Dwarf = LBR("Dwarf"),
+  Gnome = LBR("Gnome"),
+  Human = LBR("Human"),
+  NightElf = LBR("Night Elf"),
+  Goblin = LBR("Goblin"),
+  BloodElf = LBR("Blood Elf"),
+  Orc = LBR("Orc"),
+  Tauren = LBR("Tauren"),
+  Troll = LBR("Troll"),
+  Scourge = LBR("Undead"),
+  LightforgedDraenei = LBR("Lightforged Draenei"),
+  VoidElf = LBR("Void Elf"),
+  HighmountainTauren = LBR("Highmountain Tauren"),
+  Nightborne = LBR("Nightborne"),
+  DarkIronDwarf = LBR("Dark Iron Dwarf"),
+  ZandalariTroll = LBR("Zandalari Troll")
+}
 
 WeakAuras.faction_group = {
   Alliance = L["Alliance"],
@@ -602,7 +599,7 @@ end
 
 
 WeakAuras.talent_types = {}
-if not WeakAuras.IsClassic() then
+do
   local spec_frame = CreateFrame("frame");
   spec_frame:RegisterEvent("PLAYER_LOGIN")
   spec_frame:SetScript("OnEvent", update_specs);
@@ -620,27 +617,18 @@ if not WeakAuras.IsClassic() then
     end
     tier = 1
   end
-else
-  for tab = 1, 5 do
-    for num_talent = 1, 20 do
-      local talentId = (tab - 1)*20+num_talent
-      WeakAuras.talent_types[talentId] = L["Tab "]..tab.." - "..num_talent
-    end
-  end
 end
 
-if not WeakAuras.IsClassic() then
-  WeakAuras.pvp_talent_types = {
-    select(2, GetPvpTalentInfoByID(3589)),
-    select(2, GetPvpTalentInfoByID(3588)),
-    select(2, GetPvpTalentInfoByID(3587)),
-    nil
-  };
-  for i = 1,10 do
-    tinsert(WeakAuras.pvp_talent_types, string.format(L["PvP Talent %i"], i));
-  end
-else
-  WeakAuras.pvp_talent_types = {}
+
+WeakAuras.pvp_talent_types = {
+  select(2, GetPvpTalentInfoByID(3589)),
+  select(2, GetPvpTalentInfoByID(3588)),
+  select(2, GetPvpTalentInfoByID(3587)),
+  nil
+};
+
+for i = 1,10 do
+  tinsert(WeakAuras.pvp_talent_types, string.format(L["PvP Talent %i"], i));
 end
 
 -- GetTotemInfo() only works for the first 5 totems
@@ -981,30 +969,6 @@ if BuildInfo <= 80100 then -- 8.1.5
   WeakAuras.texture_types.Sparks["worldstate-capturebar-spark-green"] = "Capture Bar Green Spark"
   WeakAuras.texture_types.Sparks["worldstate-capturebar-spark-yellow"] = "Capture Bar Yellow Spark"
 end
-if WeakAuras.IsClassic() then -- Classic
-  WeakAuras.texture_types["Blizzard Alerts"] = nil
-  do
-    local beams = WeakAuras.texture_types["Beams"]
-    local beams_ids = {167096, 167097, 167098, 167099, 167100, 167101, 167102, 167103, 167104, 167105, 186192, 186193, 186194, 241098, 241099, 369749, 369750}
-    for _, v in ipairs(beams_ids) do
-      beams[tostring(v)] = nil
-    end
-  end
-  do
-    local icons = WeakAuras.texture_types["Icons"]
-    local icons_ids = {165605, 166036, 166680, 166948, 166989, 240925, 240961, 240972, 241049}
-    for _, v in ipairs(icons_ids) do
-      icons[tostring(v)] = nil
-    end
-  end
-  do
-    local runes = WeakAuras.texture_types["Runes"]
-    local runes_ids = {165633, 165885, 165922, 166340, 166753, 166754, 241003, 241004, 241005}
-    for _, v in ipairs(runes_ids) do
-      runes[tostring(v)] = nil
-    end
-  end
-end
 
 if(WeakAuras.PowerAurasPath ~= "") then
   WeakAuras.texture_types["PowerAuras Heads-Up"] = {
@@ -1198,10 +1162,6 @@ WeakAuras.swing_types = {
   ["main"] = MAINHANDSLOT,
   ["off"] = SECONDARYHANDSLOT
 }
-
-if WeakAuras.IsClassic() then
-  WeakAuras.swing_types["ranged"] = RANGEDSLOT
-end
 
 WeakAuras.rune_specific_types = {
   [1] = L["Rune #1"],
@@ -1616,20 +1576,11 @@ WeakAuras.pet_behavior_types = {
   assist = PET_MODE_ASSIST
 }
 
-if WeakAuras.IsClassic() then
-  WeakAuras.pet_behavior_types.aggressive = PET_MODE_AGGRESSIVE
-  WeakAuras.pet_behavior_types.assist = nil
-end
-
-if not WeakAuras.IsClassic() then
-  WeakAuras.pet_spec_types = {
-    [1] = select(2, GetSpecializationInfoByID(74)), -- Ferocity
-    [2] = select(2, GetSpecializationInfoByID(81)), -- Tenacity
-    [3] = select(2, GetSpecializationInfoByID(79)) -- Cunning
-  }
-else
-  WeakAuras.pet_spec_types = {}
-end
+WeakAuras.pet_spec_types = {
+  [1] = select(2, GetSpecializationInfoByID(74)), -- Ferocity
+  [2] = select(2, GetSpecializationInfoByID(81)), -- Tenacity
+  [3] = select(2, GetSpecializationInfoByID(79)) -- Cunning
+}
 
 WeakAuras.cooldown_progress_behavior_types = {
   showOnCooldown = L["On Cooldown"],
@@ -1745,10 +1696,8 @@ WeakAuras.mythic_plus_affixes = {
   [117] = true -- Reaping
 }
 
-if not WeakAuras.IsClassic() then
-  for k in pairs(WeakAuras.mythic_plus_affixes) do
-    WeakAuras.mythic_plus_affixes[k] = C_ChallengeMode.GetAffixInfo(k);
-  end
+for k in pairs(WeakAuras.mythic_plus_affixes) do
+  WeakAuras.mythic_plus_affixes[k] = C_ChallengeMode.GetAffixInfo(k);
 end
 
 WeakAuras.update_categories = {
@@ -2166,11 +2115,9 @@ for i = 1, 4 do
   WeakAuras.baseUnitId["partypet"..i] = true
 end
 
-if not WeakAuras.IsClassic() then
-  for i = 1, 5 do
-    WeakAuras.baseUnitId["arena"..i] = true
-    WeakAuras.baseUnitId["boss"..i] = true
-  end
+for i = 1, 5 do
+  WeakAuras.baseUnitId["arena"..i] = true
+  WeakAuras.baseUnitId["boss"..i] = true
 end
 
 for i = 1, 40 do
@@ -2219,32 +2166,3 @@ WeakAuras.reset_ranged_swing_spells = {
   [5019] = true, -- Shoot Wands
   [75] = true, -- Auto Shot
 }
-
-if WeakAuras.IsClassic() then
-  WeakAuras.baseUnitId.focus = nil
-  WeakAuras.baseUnitId.vehicle = nil
-  WeakAuras.unit_types.focus = nil
-  WeakAuras.unit_types_bufftrigger_2.focus = nil
-  WeakAuras.actual_unit_types_with_specific.focus = nil
-  WeakAuras.actual_unit_types_cast.focus = nil
-  WeakAuras.actual_unit_types.focus = nil
-  WeakAuras.unit_types_range_check.focus = nil
-  WeakAuras.item_slot_types[0] = AMMOSLOT
-  WeakAuras.item_slot_types[16] = MAINHANDSLOT
-  WeakAuras.item_slot_types[17] = SECONDARYHANDSLOT
-  WeakAuras.item_slot_types[18] = RANGEDSLOT
-
-  local reset_swing_spell_list = {
-    1464, 8820, 11604, 11605, -- Slam
-    78, 284, 285, 1608, 11564, 11565, 11566, 11567, 25286, -- Heroic Strike
-    845, 7369, 11608, 11609, 20569, -- Cleave
-    2973, 14260, 14261, 14262, 14263, 14264, 14265, 14266, -- Raptor Strike
-    6807, 6808, 6809, 8972, 9745, 9880, 9881, -- Maul
-    20549, -- War Stomp
-  }
-  for i, spellid in ipairs(reset_swing_spell_list) do
-    WeakAuras.reset_swing_spells[spellid] = true
-  end
-
-  WeakAuras.glow_types.ACShine = nil
-end

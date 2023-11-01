@@ -73,8 +73,6 @@ local function create(parent)
   region:SetMinResize(1, 1);
 
   local texture = region:CreateTexture();
-  texture:SetSnapToPixelGrid(false)
-  texture:SetTexelSnappingBias(0)
   region.texture = texture;
   texture:SetAllPoints(region);
 

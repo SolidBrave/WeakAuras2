@@ -1,12 +1,7 @@
-#@retail@
-## Interface: 80300
-#@end-retail@
-#@non-retail@
-# ## Interface: 11303
-#@end-non-retail@
+## Interface: 70300
 ## Title: WeakAuras Templates
 ## Author: The WeakAuras Team
-## Version: @project-version@
+## Version: 2.16.3
 ## Notes: Templates for WeakAuras
 ## X-Category: Interface Enhancements
 ## Globe-Main: WeakAuras

@@ -1,7 +1,7 @@
 if not WeakAuras.IsCorrectVersion() then return end
 
 local L = WeakAuras.L;
-local GetAtlasInfo = WeakAuras.IsClassic() and GetAtlasInfo or C_Texture.GetAtlasInfo
+local GetAtlasInfo = GetAtlasInfo
 -- Credit to CommanderSirow for taking the time to properly craft the TransformPoint function
 -- to the enhance the abilities of Progress Textures.
 -- Also Credit to Semlar for explaining how circular progress can be shown
@@ -475,8 +475,6 @@ local function createSpinner(parent, layer, drawlayer)
 
   for i = 1, 3 do
     local texture = parent:CreateTexture(nil, layer);
-    texture:SetSnapToPixelGrid(false)
-    texture:SetTexelSnappingBias(0)
     texture:SetDrawLayer(layer, drawlayer);
     texture:SetAllPoints(parent);
     spinner.textures[i] = texture;
@@ -683,8 +681,6 @@ local textureFunctions = {
 
 local function createTexture(region, layer, drawlayer)
   local texture = region:CreateTexture(nil, layer);
-  texture:SetSnapToPixelGrid(false)
-  texture:SetTexelSnappingBias(0)
   texture:SetDrawLayer(layer, drawlayer);
 
   for k, v in pairs(textureFunctions) do

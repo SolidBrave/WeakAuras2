@@ -1,7 +1,7 @@
 if not WeakAuras.IsCorrectVersion() then return end
 
 local L = WeakAuras.L;
-local GetAtlasInfo = WeakAuras.IsClassic() and GetAtlasInfo or C_Texture.GetAtlasInfo
+local GetAtlasInfo = GetAtlasInfo
 local function createOptions(id, data)
   local options = {
     __title = L["Progress Texture Settings"],
@@ -815,10 +815,6 @@ local templates = {
     },
   },
 }
-
-if WeakAuras.IsClassic() then
-  table.remove(templates, 2)
-end
 
 local function GetAnchors(data)
   return WeakAuras.default_types_for_anchor

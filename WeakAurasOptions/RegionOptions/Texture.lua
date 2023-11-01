@@ -228,10 +228,6 @@ local templates = {
   },
 }
 
-if WeakAuras.IsClassic() then
-  table.remove(templates, 2)
-end
-
 local function GetAnchors(data)
   return WeakAuras.default_types_for_anchor
 end
